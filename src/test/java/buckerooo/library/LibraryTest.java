@@ -1,6 +1,8 @@
 package buckerooo.library;
 
+import com.google.common.collect.Lists;
 import com.sun.tools.javac.jvm.Items;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.time.Clock;
@@ -9,8 +11,11 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.Temporal;
 import java.time.temporal.TemporalUnit;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.*;
 
 import static buckerooo.library.ItemType.Book;
 import static buckerooo.library.Item.book;
@@ -25,7 +30,9 @@ import static java.time.ZoneId.systemDefault;
 import static java.time.temporal.ChronoUnit.DAYS;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.nCopies;
 import static java.util.Collections.singletonList;
+import static java.util.concurrent.Executors.newFixedThreadPool;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
@@ -152,6 +159,37 @@ public class LibraryTest {
 
         clock.moveForward(1, DAYS);
         assertThat(library.overdueItems(), equalTo(asList(item1, item2)));
+    }
+
+    @Test
+    @Ignore
+    public void makeSureWeOnlyGiveOutTheItemsWeHaveInTheLibrary() throws InterruptedException, ExecutionException {
+
+        Library library = new Library(fixed(now(), systemDefault()),
+                asList(dvd("1", "7", "Pi"), dvd("2", "7", "Pi"))
+        );
+
+        /* get 20 people to all try and take the same book out at the same time */
+        List<Future<Receipt>> attemptsToBorrowItem = newFixedThreadPool(20).invokeAll(
+                nCopies(20, () -> library.borrowItem("Pi", DVD))
+        );
+
+        List<Receipt> actualItemsBorrowed = new ArrayList<>();
+        int failedAttemptsToBorrowItem = 0;
+        for (Future<Receipt> receiptFuture : attemptsToBorrowItem) {
+            try {
+                actualItemsBorrowed.add(receiptFuture.get());
+            } catch (ExecutionException e) {
+                if (e.getCause() instanceof ItemOutOfStockException) {
+                    failedAttemptsToBorrowItem++;
+                } else {
+                    throw e;
+                }
+            }
+        }
+
+        assertThat("Only 2 copies of the item should have been borrowed", actualItemsBorrowed.size(), equalTo(2));
+        assertThat(failedAttemptsToBorrowItem, equalTo(18));
     }
 
 }

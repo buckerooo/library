@@ -4,6 +4,7 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -23,7 +24,5 @@ public class LibraryLoadTest {
 
 
         Library library = new Library(fixed(now(), systemDefault()), items);
-
-        Executors.newFixedThreadPool(5);
     }
 }
