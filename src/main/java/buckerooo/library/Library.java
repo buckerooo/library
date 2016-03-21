@@ -3,7 +3,6 @@ package buckerooo.library;
 import com.google.common.base.Objects;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
-import com.sun.tools.javac.jvm.Items;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -38,7 +37,7 @@ public class Library {
                 .collect(toList());
     }
 
-    public Receipt borrowItem(String title, ItemType type) throws ItemNotFoundException, ItemOutOfStockException {
+    public Receipt borrowItem(String title, ItemType type, User user) throws ItemNotFoundException, ItemOutOfStockException {
         if (! libraryItems.containsKey(new ItemKey(title, type))) {
            throw itemNotFound(title, type);
         }
@@ -50,7 +49,7 @@ public class Library {
             StockItem itemToBeBorrowed = pickItem(title, type, items);
             /* we have an item so lets try and borrow it */
             try {
-                itemToBeBorrowed.borrowItem();
+                itemToBeBorrowed.borrowItem(user);
                 return new Receipt(LocalDate.now(clock), itemToBeBorrowed.item);
             } catch(ItemOutOfStockException e) {
                 /* someone must have sneaked in and borrowed it, lets try and borrow another item */
@@ -83,22 +82,33 @@ public class Library {
                 .collect(toList());
     }
 
+    public List<Item> borrowedItems(User user) {
+        return libraryItems.values()
+                .stream()
+                .filter(stockItem -> !stockItem.inStock())
+                .filter(stockItem -> stockItem.borrowedBy().equals(user))
+                .map(stockItem -> stockItem.item)
+                .collect(toList());
+    }
+
     /* test this!! */
     public class StockItem {
         public final Item item;
 
         private LocalDateTime borrowedTime;
+        private User borrowedBy;
 
         public StockItem(Item item) {
             this.item = item;
         }
 
-        public synchronized void borrowItem() throws ItemOutOfStockException {
+        public synchronized void borrowItem(User user) throws ItemOutOfStockException {
 
             if(this.borrowedTime != null) {
                 throw ItemOutOfStockException.itemOutOfStock(item.title, item.type);
             }
 
+            this.borrowedBy = user;
             this.borrowedTime = LocalDateTime.now(clock);
         }
 
@@ -112,6 +122,10 @@ public class Library {
 
         public LocalDate borrowedDate() {
             return borrowedTime.toLocalDate();
+        }
+
+        public User borrowedBy() {
+            return borrowedBy;
         }
     }
 

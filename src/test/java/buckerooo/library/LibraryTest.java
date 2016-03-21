@@ -16,6 +16,7 @@ import static buckerooo.library.Item.dvd;
 import static buckerooo.library.Item.vhs;
 import static buckerooo.library.ItemType.DVD;
 import static buckerooo.library.ItemType.VHS;
+import static buckerooo.library.User.user;
 import static java.time.Clock.fixed;
 import static java.time.Clock.systemUTC;
 import static java.time.Instant.now;
@@ -58,10 +59,33 @@ public class LibraryTest {
                 vhs ("4", "5", "WarGames"))
         );
 
-        Receipt receipt = library.borrowItem("Introduction to Algorithms", Book);
+        Receipt receipt = library.borrowItem("Introduction to Algorithms", Book, user("buck"));
 
         assertThat(receipt.returnDate, equalTo(LocalDate.now(now)));
         assertThat(receipt.item, equalTo(itemToBeBorrowed));
+    }
+
+    @Test
+    public void canSeeTheItemsAUserHasCurrentlyBorrowed() throws Exception {
+
+        Clock now = fixed(now(), systemDefault());
+
+        Item itemToBeBorrowed1 = book("3", "4", "Introduction to Algorithms");
+        Item itemToBeBorrowed2 = vhs("4", "5", "WarGames");
+        Library library = new Library(now, asList(
+                dvd ("1", "7", "Pi"),
+                dvd ("2", "7", "Pi"),
+                itemToBeBorrowed1,
+                itemToBeBorrowed2)
+        );
+
+        User user = user("buck");
+        library.borrowItem(itemToBeBorrowed1.title, itemToBeBorrowed1.type, user);
+        library.borrowItem(itemToBeBorrowed2.title, itemToBeBorrowed2.type, user);
+
+        List<Item> borrowedItems = library.borrowedItems(user);
+
+        assertThat(borrowedItems, equalTo(asList(itemToBeBorrowed1, itemToBeBorrowed2)));
     }
 
     @Test
@@ -69,7 +93,7 @@ public class LibraryTest {
         Library library = new Library(fixed(now(), systemDefault()), emptyList());
 
         try {
-            library.borrowItem("some random item", VHS);
+            library.borrowItem("some random item", VHS, user("buck"));
             fail("The item should not have been found");
         } catch (ItemNotFoundException e) {
             assertThat(e.getMessage(), equalTo("Could not find the VHS, some random item, you want to borrow"));
@@ -82,10 +106,10 @@ public class LibraryTest {
                 singletonList(dvd("1", "7", "Pi"))
         );
 
-        library.borrowItem("Pi", DVD);
+        library.borrowItem("Pi", DVD, user("buck"));
 
         try {
-            library.borrowItem("Pi", DVD);
+            library.borrowItem("Pi", DVD, user("buck"));
             fail("The item should have been out of stock");
         } catch (ItemOutOfStockException e) {
             assertThat(e.getMessage(), equalTo("The Pi DVD is currently out of stock"));
@@ -99,7 +123,7 @@ public class LibraryTest {
 
         assertThat("should be a single item in the library", library.currentInventory(), equalTo(libraryItems));
 
-        Receipt receiptForBorrowedItem = library.borrowItem("Pi", DVD);
+        Receipt receiptForBorrowedItem = library.borrowItem("Pi", DVD, user("buck"));
 
         assertThat("the only item has been taken, so library should be empty", library.currentInventory(), equalTo(emptyList()));
 
@@ -141,11 +165,11 @@ public class LibraryTest {
         MoveableClock clock = new MoveableClock();
         Library library = new Library(clock, libraryItems);
 
-        library.borrowItem("Pi", DVD);
+        library.borrowItem("Pi", DVD, user("buck"));
 
         clock.moveForward(1, DAYS);
 
-        library.borrowItem("Pi 2", DVD);
+        library.borrowItem("Pi 2", DVD, user("buck"));
 
         clock.moveForward(7, DAYS);
         assertThat(library.overdueItems(), equalTo(singletonList(item1)));
@@ -163,7 +187,7 @@ public class LibraryTest {
 
         /* get 20 people to all try and take the same book out at the same time */
         List<Future<Receipt>> attemptsToBorrowItem = newFixedThreadPool(20).invokeAll(
-                nCopies(20, () -> library.borrowItem("Pi", DVD))
+                nCopies(20, () -> library.borrowItem("Pi", DVD, user("buck")))
         );
 
         List<Receipt> actualItemsBorrowed = new ArrayList<>();
@@ -196,10 +220,10 @@ public class LibraryTest {
 
         /* borrow all the items */
         List<Future<Receipt>> attemptsToBorrowPiItem = newFixedThreadPool(5).invokeAll(
-                nCopies(50, () -> library.borrowItem("Pi", DVD))
+                nCopies(50, () -> library.borrowItem("Pi", DVD, user("buck")))
         );
         List<Future<Receipt>> attemptsToBorrowPi2Item = newFixedThreadPool(5).invokeAll(
-                 nCopies(50, () -> library.borrowItem("Pi 2", DVD))
+                 nCopies(50, () -> library.borrowItem("Pi 2", DVD, user("buck")))
         );
 
         List<Future<Receipt>> allItemsToBorrow = new ArrayList<>();
