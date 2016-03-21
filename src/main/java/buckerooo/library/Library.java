@@ -45,15 +45,24 @@ public class Library {
 
         /* look to see if any items are in stock */
         Collection<StockItem> items = libraryItems.get(new ItemKey(title, type));
-        StockItem itemToBeBorrowed = items.stream()
-                .filter(StockItem::inStock)
-                .findFirst()
-                .orElseThrow(() -> itemOutOfStock(title, type));
 
-        /* we have an item so lets borrow it */
-        itemToBeBorrowed.borrowItem();
+        while(true) {
+            StockItem itemToBeBorrowed = pickItem(title, type, items);
+            /* we have an item so lets try and borrow it */
+            try {
+                itemToBeBorrowed.borrowItem();
+                return new Receipt(LocalDate.now(clock), itemToBeBorrowed.item);
+            } catch(ItemOutOfStockException e) {
+                /* someone must have sneaked in and borrowed it, lets try and borrow another item */
+            }
+        }
+    }
 
-        return new Receipt(LocalDate.now(clock), itemToBeBorrowed.item);
+    private StockItem pickItem(String title, ItemType type, Collection<StockItem> items) throws ItemOutOfStockException {
+        return items.stream()
+                    .filter(StockItem::inStock)
+                    .findAny()
+                    .orElseThrow(() -> itemOutOfStock(title, type));
     }
 
     public void returnItem(Item item) throws ItemNotFoundException {
@@ -84,11 +93,16 @@ public class Library {
             this.item = item;
         }
 
-        public void borrowItem() {
+        public synchronized void borrowItem() throws ItemOutOfStockException {
+
+            if(this.borrowedTime != null) {
+                throw ItemOutOfStockException.itemOutOfStock(item.title, item.type);
+            }
+
             this.borrowedTime = LocalDateTime.now(clock);
         }
 
-        public void returnItem() {
+        public synchronized void returnItem() {
             this.borrowedTime = null;
         }
 

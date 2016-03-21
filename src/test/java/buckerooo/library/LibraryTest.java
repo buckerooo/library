@@ -1,19 +1,12 @@
 package buckerooo.library;
 
-import com.google.common.collect.Lists;
-import com.sun.tools.javac.jvm.Items;
 import org.junit.Ignore;
 import org.junit.Test;
 
 import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
-import java.time.temporal.Temporal;
-import java.time.temporal.TemporalUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.*;
 
@@ -162,7 +155,6 @@ public class LibraryTest {
     }
 
     @Test
-    @Ignore
     public void makeSureWeOnlyGiveOutTheItemsWeHaveInTheLibrary() throws InterruptedException, ExecutionException {
 
         Library library = new Library(fixed(now(), systemDefault()),
@@ -190,6 +182,65 @@ public class LibraryTest {
 
         assertThat("Only 2 copies of the item should have been borrowed", actualItemsBorrowed.size(), equalTo(2));
         assertThat(failedAttemptsToBorrowItem, equalTo(18));
+    }
+
+    @Test
+    @Ignore
+    public void borrowAndReturnALargeAmountOfItems() throws InterruptedException {
+        List<Item> allLibraryItems = new ArrayList<>();
+
+        nCopiesOf("Pi", 10, allLibraryItems);
+        nCopiesOf("Pi 2", 10, allLibraryItems);
+
+        Library library = new Library(fixed(now(), systemDefault()), allLibraryItems);
+
+        /* borrow all the items */
+        List<Future<Receipt>> attemptsToBorrowPiItem = newFixedThreadPool(5).invokeAll(
+                nCopies(50, () -> library.borrowItem("Pi", DVD))
+        );
+        List<Future<Receipt>> attemptsToBorrowPi2Item = newFixedThreadPool(5).invokeAll(
+                 nCopies(50, () -> library.borrowItem("Pi 2", DVD))
+        );
+
+        List<Future<Receipt>> allItemsToBorrow = new ArrayList<>();
+        allItemsToBorrow.addAll(attemptsToBorrowPiItem);
+        allItemsToBorrow.addAll(attemptsToBorrowPi2Item);
+
+        List<Receipt> actualItemsBorrowed = new ArrayList<>();
+        for (Future<Receipt> receiptFuture : allItemsToBorrow) {
+            try {
+                actualItemsBorrowed.add(receiptFuture.get());
+            } catch (ExecutionException ignore) {}
+        }
+
+//        assertThat("we should have borrowed all the items", actualItemsBorrowed.size(), equalTo(allLibraryItems.size()));
+        assertThat(library.currentInventory().size(), equalTo(0));
+
+        /* return all the items */
+        List<Callable<Void>> allItemsToReturn = new ArrayList<>();
+        for (Receipt receiptFromBorrowedItem : actualItemsBorrowed) {
+            allItemsToReturn.add(() -> {
+                library.returnItem(receiptFromBorrowedItem.item);
+                return null;
+            });
+        }
+        for (Future<Void> itemBeingReturned : newFixedThreadPool(5).invokeAll(allItemsToReturn)) {
+            try {
+                itemBeingReturned.get();
+            } catch (ExecutionException e) {
+                e.printStackTrace();
+            }
+        }
+
+        /* check what we have in stock */
+        assertThat(library.currentInventory().size(), equalTo(allLibraryItems.size()));
+    }
+
+    private void nCopiesOf(String title, int numberOfCopies, List<Item> allLibraryItems) {
+        int currentItemsSize = allLibraryItems.size();
+        for (int i = allLibraryItems.size(); i <= currentItemsSize + numberOfCopies; i++) {
+            allLibraryItems.add(dvd(String.valueOf(i), "7", title));
+        }
     }
 
 }
