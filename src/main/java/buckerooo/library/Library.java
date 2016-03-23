@@ -114,6 +114,7 @@ public class Library {
 
         public synchronized void returnItem() {
             this.borrowedTime = null;
+            this.borrowedBy = null;
         }
 
         public boolean inStock() {

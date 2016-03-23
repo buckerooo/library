@@ -7,6 +7,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.*;
 
@@ -83,9 +84,13 @@ public class LibraryTest {
         library.borrowItem(itemToBeBorrowed1.title, itemToBeBorrowed1.type, user);
         library.borrowItem(itemToBeBorrowed2.title, itemToBeBorrowed2.type, user);
 
-        List<Item> borrowedItems = library.borrowedItems(user);
+        assertThat(library.borrowedItems(user), equalTo(asList(itemToBeBorrowed1, itemToBeBorrowed2)));
 
-        assertThat(borrowedItems, equalTo(asList(itemToBeBorrowed1, itemToBeBorrowed2)));
+        library.returnItem(itemToBeBorrowed2);
+        assertThat(library.borrowedItems(user), equalTo(singletonList(itemToBeBorrowed1)));
+
+        library.returnItem(itemToBeBorrowed1);
+        assertThat(library.borrowedItems(user), equalTo(asList()));
     }
 
     @Test
